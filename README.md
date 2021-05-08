@@ -188,3 +188,7 @@ Désormais, le contenu des deux sites (étapes 1 et étape2) peut être récupé
 ![static3](figures/static3.png)
 
 ![dynamic3](figures/dynamic3.png)
+
+### État de l'infrastructure
+Un navigateur est capable de consulter les sites des deux conteneurs fabriqués à partir de Apache-php-image.
+![étape3](figures/infra3.png)
