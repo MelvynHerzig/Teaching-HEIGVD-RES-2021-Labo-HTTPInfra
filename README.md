@@ -192,3 +192,77 @@ Désormais, le contenu des deux sites (étapes 1 et étape2) peut être récupé
 ### État de l'infrastructure
 Un navigateur est capable de consulter les sites des deux conteneurs fabriqués à partir de Apache-php-image.
 ![étape3](figures/infra3.png)
+
+## Étape 4) Requêtes AJAX avec JQUERY
+Au terme de cette étape, nous avons édité le site php statique afin qu'il effectue des requêtes asynchrones
+vers le site express dynamique.
+
+> Retrospectivement, les 3 Dockerfiles ont été modifiés afin d'installer vim sur les images.
+
+### Script JQUERY
+La page d'accueil (dans <i> docker-images/apache-php-image/content/index.html</i>) a été modifiée pour charger le script
+<i> docker-images/apache-php-image/content/js/coolnames.js</i> 
+
+```
+$(function() {
+
+    console.log("loading cool names");
+    function loadCoolNames(){
+            $.getJSON("/api/names/", function( names ){
+                    console.log( names );
+
+                    var message = "";
+                    for(i = 0; i < names.length; i++){
+                            message +="<h3>"+ names[i].coolName + "</h3><br/>";
+                    }
+
+                    console.log(message);
+
+                    $(".coolNamesClass").html(message);
+
+            });
+    };
+
+    loadCoolNames();
+    setInterval(loadCoolNames, 5000);
+});
+```
+> Ce script effectue une requête asynchrone (toutes les 5 secondes) vers notre site express.
+> Il récupère la réponse au format JSON. Il la transforme en créant des titre h3 qui seront placé dans la balise
+> de classe "coolNamesClass".
+
+Comme le montre la console de notre navigateur.
+
+![preuve14](figures/proof1_4.png)
+
+> Nous voyons que la fonction est appelée depuis la requête grâce au log "Loading cool names"
+
+> Ensuite, nous appercevons la réponse JSON.
+
+> Finalement, nous voyons le post-traitement de la réponse.
+
+Voici un aperçu des requêtes interceptées depuis notre navigateur.
+
+![preuve24](figures/proof2_4.png)
+
+> Dans un premier temps, nous observons la demande vers demo.res.ch de la ressource /api/names/
+
+> Finalement, nous avons l'entête de la réponse.
+
+### Importance du proxy
+Le reverse proxy joue un rôle essentiel. Une politique appelée "Same-origin policy" empêche le chargement
+de ressources en provenance de différentes sources (notre conteneur static vs notre conteneur dynamic).
+
+Or, d'un point de vue client (de notre navigateur), toutes les ressources proviennent du reverse proxy, ce qui respect la "Same-origin policy".
+
+### Aperçu
+Voici le site statique avec la section "here are some cool names for you!" qui se met à jour toutes les 5 secondes.
+Chaque nouvelle liste est composée de longueur variable (entre 1 et 10, voir étape 2 pour plus d'information sur le génération des listes).
+
+![siteEtape4](figures/site4.png)
+
+### État de l'infrastructure
+En se connectant, la page statique est chargée.
+Dans un second temps et après chaque 5 seconde, la liste des <i>cool names</i> est mise à jour.
+
+![étape4](figures/infra4.png)
