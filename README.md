@@ -266,3 +266,142 @@ En se connectant, la page statique est chargée.
 Dans un second temps et après chaque 5 seconde, la liste des <i>cool names</i> est mise à jour.
 
 ![étape4](figures/infra4.png)
+
+---
+## Étape 5) Configuration dynamique du reverse proxy
+<b> Branche: </b> fb-dynamic-configuration.
+
+Au terme de cette étape, les adresses ip dans <i> Docker/apache-reverse-proxy/conf/sites-available/001-reverse-proxy.conf</i>
+sont ajoutées dynamiquement à l'aide des variables d'environnement Docker reçu avec la commande run et l'argument <i>-e</i>.
+
+### Génération dynamique de l'hôte virtuelle
+Afin de générer l'hôte virtuelle dynamiquement, nous avons créé notre propre version du script <i> apache2-foreground</i> 
+utilisé dans l'image [php:apache-7.2](https://github.com/docker-library/php/blob/master/7.3/buster/apache/apache2-foreground).
+Le fichier complet se trouve dans <i> docker-images/apache-reverse-proxy/apache2-foreground</i>
+
+Basiquement la ligne suivante a été ajouté:
+```
+php /var/apache2/templates/config-template.php > /etc/apache2/sites-available/001-reverse-proxy.conf
+```
+Elle permet de compléter le template <i>config-template.php</i> grâce à php et de stocker le résultat dans l'hôte virtuel de <i>001-reverse-proxy.conf</i>.
+
+> Désormais, le contenu initial (présenté à l'étape 3) dans <i>001-reverse-proxy.conf</i> n'est plus important. Il est remplacé par le moteur de template
+
+La page d'accueil (dans <i> docker-images/apache-php-image/content/index.html</i>) a été modifiée pour charger le script
+<i> docker-images/apache-php-image/content/js/coolnames.js</i> 
+
+#### Fichier config-template.php
+
+Le contenu du fichier <i>docker-images/apache-reverse-proxy/templates/config-template.php</i> est le suivant:
+
+```
+<?php
+  $DYNAMIC_APP = getenv('DYNAMIC_APP');
+  $STATIC_APP = getenv('STATIC_APP');
+?>
+
+<VirtualHost *:80>
+
+    ServerName demo.res.ch
+
+    # ErrorLog ${APACHE_LOG_DIR}/error.log
+    # CustomLog ${APACHE_LOG_DIR}/access.log combined
+  
+    ProxyPass '/api/names/' 'http://<?php print "$DYNAMIC_APP"?>/'
+    ProxyPassReverse '/api/names/' 'http://<?php print "$DYNAMIC_APP"?>/'
+
+    ProxyPass '/' 'http://<?php print "$STATIC_APP"?>/'
+    ProxyPassReverse '/' 'http://<?php print "$STATIC_APP"?>/'
+
+</VirtualHost>
+```
+
+> Il récupère les variable d'environnement DYNAMIC_APP et STATIC_APP afin de les insérer dans l'hôte virtuelle.
+> Ces deux variables sont sensés représenter l'adresse ip et le port de leur conteneur respectif.
+
+#### Dockerfile
+
+En conséquence le Dockerfile <i>/docker-images/apache-reverse-proxy/Dockerfile</i> a été modifié.
+
+```
+FROM php:7.2-apache 
+
+RUN apt-get update && \
+    apt-get install -y vim
+
+COPY apache2-foreground /usr/local/bin/
+COPY templates/ /var/apache2/templates/
+COPY conf/ /etc/apache2
+
+RUN a2enmod proxy proxy_http
+RUN a2ensite 000-* 001-*
+```
+> Désormais, il remplace le fichier <i>apache2-foreground</i> dans /usr/local/bin par notre propre version.
+> De plus, il place le fichier <i>docker-images/apache-reverse-proxy/templates/config-template.php</i> dans <i>/var/apache2/templates/</i>.
+
+### Script de démarrage
+
+Comme le démarrage de l'infrastructure devient fastidieux, nous avons mis en place un script powerShell afin de démarrer
+tout ce petit monde. Le fichier s'appelle <i>startInfra.ps1</i> et se trouve à la racine de répertoire.
+
+N'utilisez pas ce script si vous avez des conteneurs qui ne doivent pas être supprimés.
+
+```
+# Nettoyage des conteneurs
+Write-Output "--- Kill des conteneurs"
+docker kill $(docker ps -qa)
+
+Write-Output "--- Retrait des conteneurs"
+docker rm $(docker ps -qa)
+
+# Vérification de l'existence des images
+$existApachePhp = docker images -q res/apache_php
+if($null -eq $existApachePhp)
+{
+    Write-Output "--- Build apache_static"
+    docker build -t res/apache_php ./docker-images/apache-php-image/
+}
+
+$existExpressDynamic = docker images -q res/express_names
+if($null -eq $existExpressDynamic)
+{
+    Write-Output "--- Build express_dynamic"
+docker build -t res/express_names ./docker-images/express-image/    
+}
+
+$existApacheRP = docker images -q res/apache_rp
+if($null -eq $existApacheRP)
+{
+    Write-Output "--- Build apache_rp"
+    docker build -t res/apache_rp ./docker-images/apache-reverse-proxy/
+}
+
+# Démarrage des conteneurs
+Write-Output "--- Demarrage du conteneur apache static"
+docker run -d --name apache_static res/apache_php
+
+
+Write-Output "--- Demarrage du conteneur expresse dynamic"
+docker run -d --name express_dynamic res/express_names
+
+
+Write-Output "--- Demarrage du conteneur apache reverse proxy"
+$static_app = docker inspect -f '{{range .NetworkSettings.Networks}}{{.IPAddress}}{{end}}' apache_static 
+$dynamic_app = docker inspect -f '{{range .NetworkSettings.Networks}}{{.IPAddress}}{{end}}' express_dynamic
+ 
+
+docker run -d -p 8080:80 -e STATIC_APP=$($static_app + ':80') -e DYNAMIC_APP=$($dynamic_app + ':3000') --name apache_rp res/apache_rp
+```
+
+> Le script commence par éteindre et supprimer tous les conteneurs (évitez donc d'utiliser ce script si vous avez des conteneurs importants).
+
+> Ensuite il vérifie si les images existes sinon il les construit. Si les images sont présentes mais que vous voulez les mettre à jour, il faut les supprimer manuellement.
+> De cette façon, nous évitons de rebuild les images si ces dernières n'ont pas été modifiées
+
+> Finalement, il démarre les sites statique et dynamiques, récupères leur adresse ip et démarre le reverse proxy en lui donnant les
+> adresses en variable d'environnement.
+
+
+### État de l'infrastructure
+
+![étape5](figures/infra5.png)
