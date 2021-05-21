@@ -413,3 +413,150 @@ docker run -d -p 8080:80 -e STATIC_APP=$($static_app + ':80') -e DYNAMIC_APP=$($
 ### État de l'infrastructure
 
 ![étape5](figures/infra5.png)
+
+---
+## Bonus 6) Balancement de charge
+<b> Branche: </b> fb-load-balancing.
+
+Cette étape à consisté à la mise en place d'un répartisseur de charge au niveau du reverse proxy
+
+### Mise à jour du script de lancement de l'infra structure.
+Pour illustrer le balancement de charge, nous créons, non plus un conteneur apache statique et un conteneur expresse dynamique,
+mais deux de chaque.
+
+Le lancement du conteneur du reverse proxy a été modifié pour integré les deux nouvelles ip de l'infrastructure
+
+Nouveau scripte <i>startInfra.ps1</i>
+```
+# Nettoyage des conteneurs
+Write-Output "--- Kill des conteneurs"
+docker kill $(docker ps -qa)
+
+Write-Output "--- Retrait des conteneurs"
+docker rm $(docker ps -qa)
+
+# Vérification de l'existence des images
+$existApachePhp = docker images -q res/apache_php
+if($null -eq $existApachePhp)
+{
+    Write-Output "--- Build apache_static"
+    docker build -t res/apache_php ./docker-images/apache-php-image/
+}
+
+$existExpressDynamic = docker images -q res/express_names
+if($null -eq $existExpressDynamic)
+{
+    Write-Output "--- Build express_dynamic"
+docker build -t res/express_names ./docker-images/express-image/    
+}
+
+$existApacheRP = docker images -q res/apache_rp
+if($null -eq $existApacheRP)
+{
+    Write-Output "--- Build apache_rp"
+    docker build -t res/apache_rp ./docker-images/apache-reverse-proxy/
+}
+
+# Démarrage des conteneurs
+Write-Output "--- Demarrage des conteneurs apache static"
+docker run -d --name apache_static1 res/apache_php
+docker run -d --name apache_static2 res/apache_php
+
+
+Write-Output "--- Demarrage des conteneurs expresse dynamic"
+docker run -d --name express_dynamic1 res/express_names
+docker run -d --name express_dynamic2 res/express_names
+
+
+Write-Output "--- Demarrage du conteneur apache reverse proxy"
+$static_app1 = docker inspect -f '{{range .NetworkSettings.Networks}}{{.IPAddress}}{{end}}' apache_static1 
+$static_app2 = docker inspect -f '{{range .NetworkSettings.Networks}}{{.IPAddress}}{{end}}' apache_static2 
+$dynamic_app1 = docker inspect -f '{{range .NetworkSettings.Networks}}{{.IPAddress}}{{end}}' express_dynamic1
+$dynamic_app2 = docker inspect -f '{{range .NetworkSettings.Networks}}{{.IPAddress}}{{end}}' express_dynamic2
+ 
+
+docker run -d -p 8080:80 -e STATIC_APP1=$($static_app1 + ':80') -e STATIC_APP2=$($static_app2 + ':80') -e DYNAMIC_APP1=$($dynamic_app1 + ':3000') -e DYNAMIC_APP2=$($dynamic_app2 + ':3000') --name apache_rp res/apache_rp
+
+```
+
+### Mise à jour du dockerfile
+
+Le contenu du fichier <i>docker-images/apache-reverse-proxy/Dockerfile</i> a été mis à jour pour
+activer le loadbalancing de apache.
+
+```
+FROM php:7.2-apache 
+
+RUN apt-get update && \
+    apt-get install -y vim
+
+COPY apache2-foreground /usr/local/bin/
+COPY templates/ /var/apache2/templates/
+COPY conf/ /etc/apache2
+
+RUN a2enmod proxy proxy_http proxy_balancer lbmethod_byrequests
+
+RUN a2ensite 000-* 001-*
+```
+
+> Nous activons les modules apaches proxy_balancer et lbmethod_byrequests
+
+### Mise à jour template de 001-reverse-proxy.conf
+
+Le contenu du fichier <i>docker-images/apache-reverse-proxy/templates,config-template.php</i> a été mis à jour pour 
+prendre en compte que deux nouveaux serveurs rejoignent l'infrastructure et que le balancement a été activé.
+
+```
+<?php
+  # Récupération des adresses des serveurs apache dynamiques
+  $DYNAMIC_APP1 = getenv('DYNAMIC_APP1');
+  $DYNAMIC_APP2 = getenv('DYNAMIC_APP2');
+
+  # Récupération des adresses des serveurs apache "statiques"
+  $STATIC_APP1 = getenv('STATIC_APP1');
+  $STATIC_APP2 = getenv('STATIC_APP2');
+?>
+
+<VirtualHost *:80>
+
+    ServerName demo.res.ch
+
+    # Configuration du load balancing
+
+    <Proxy "balancer://dynamic_cluster">
+	    BalancerMember "http://<?php print "$DYNAMIC_APP1"?>"
+	    BalancerMember "http://<?php print "$DYNAMIC_APP2"?>"
+	  </Proxy>
+
+    <Proxy "balancer://static_cluster">
+	    BalancerMember "http://<?php print "$STATIC_APP1"?>"
+	    BalancerMember "http://<?php print "$STATIC_APP2"?>"
+	  </Proxy>
+
+    ProxyPass "/api/names/" "balancer://dynamic_cluster/"
+    ProxyPassReverse "/api/names/" 'balancer://dynamic_cluster/"
+      
+    ProxyPass "/" "balancer://static_cluster/"
+    ProxyPassReverse "/" "balancer://static_cluster/"
+
+</VirtualHost>
+```
+> Nous récupérons deux nouvelles variables d'environnement avec les ip des deux nouveaux serveurs.
+
+> Nous créons deux cluster de serveur <i>dynamic_cluster</i> et <i>static_cluster<i>.
+  
+> Dans <i>ProxyPass</i> et <i>ProxyPassReverse</i>, nous configurons le proxy pour rediriger les requêtes sur le bon cluster en fonction de la ressource
+
+### Tests
+
+Nous commencer par démarrer l'infrastructure avec le script, 5 conteneur tournent. A l'aide du navigateur, nous nous connectons au serveur statique <i> demo.res.ch:8080 </i>.
+À ce moment nous recevons le site statique avec la mise à jour des cool names.
+Nous faisons tomber deux conteneur, un conteneur apache statique et un conteneur expresse dynamique. Nous rechargeons la page, tout continue de fonctionner.
+Nous remontons les deux conteneurs précédement éteints et nous tuons les deux autres conteneurs staitique et dynamique. Nous rechargeons la page et tout continue de fonctionner.
+
+Le balancement de charge est fonctionnel.
+
+
+### État de l'infrastructure
+
+![étapeBonusLoadBalancing](figures/infraBonus1.png)
