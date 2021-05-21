@@ -8,6 +8,8 @@ Toutes les manipulations présentées ont été effectuées sous Windows 10 avec
 
 ---
 ## Étape 1) Mise en place d'un site statique avec apache httpd
+<b> Branche: </b> fb-apache-static.
+
 Cette étape consiste à mettre un place une image Docker permettant de créer 
 des conteneurs avec php:7.2 et déployer un site statique.
 
@@ -36,6 +38,8 @@ Un navigateur est capable de consulter les sites des deux conteneurs fabriqués 
 
 ---
 ## Étape 2) Mise en place d'un site dynamique avec expresse
+<b> Branche: </b> fb-expresse-dynamic.
+
 Cette étape consiste à mettre un place une image Docker permettant de créer 
 des conteneurs avec node:14.16 et déployer un site dynamique
 
@@ -111,6 +115,8 @@ Il est possible d'effectuer des requêtes avec un navigateur, un client telnet o
 
 ---
 ## Étape 3) Reverse proxy avec apache (configuration statique)
+<b> Branche: </b> fb-apache-reverse-proxy.
+
 Durant cette étape, nous avons mis en place un reverse proxy avec les adresses ip hardcodées.
 
 En principe, pour que la configuration fonctionne, il faut démarrer les conteneurs dans
@@ -194,6 +200,8 @@ Un navigateur est capable de consulter les sites des deux conteneurs fabriqués 
 ![étape3](figures/infra3.png)
 
 ## Étape 4) Requêtes AJAX avec JQUERY
+<b> Branche: </b> fb-ajax-query.
+
 Au terme de cette étape, nous avons édité le site php statique afin qu'il effectue des requêtes asynchrones
 vers le site express dynamique.
 
