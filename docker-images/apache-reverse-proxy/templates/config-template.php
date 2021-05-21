@@ -14,20 +14,20 @@
 
     # Configuration du load balancing
 
-    <Proxy "balancer://dynamic_cluster">
+    <Proxy "balancer://dynamic_cluster/">
 	    BalancerMember "http://<?php print "$DYNAMIC_APP1"?>"
 	    BalancerMember "http://<?php print "$DYNAMIC_APP2"?>"
 	</Proxy>
 
-    <Proxy "balancer://static_cluster">
+    <Proxy "balancer://static_cluster/">
 	    BalancerMember "http://<?php print "$STATIC_APP1"?>"
 	    BalancerMember "http://<?php print "$STATIC_APP2"?>"
 	</Proxy>
 
-    ProxyPass "/api/names/" "balancer://dynamic_cluster"
-    ProxyPassReverse "/api/names/" 'balancer://dynamic_cluster"
+    ProxyPass "/api/names/" "balancer://dynamic_cluster/"
+    ProxyPassReverse "/api/names/" 'balancer://dynamic_cluster/"
       
-    ProxyPass "/" "balancer://static_cluster"
-    ProxyPassReverse "/" "balancer://static_cluster"
+    ProxyPass "/" "balancer://static_cluster/"
+    ProxyPassReverse "/" "balancer://static_cluster/"
 
 </VirtualHost>
