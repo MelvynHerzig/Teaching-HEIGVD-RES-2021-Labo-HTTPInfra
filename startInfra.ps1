@@ -28,17 +28,21 @@ if($null -eq $existApacheRP)
 }
 
 # Démarrage des conteneurs
-Write-Output "--- Demarrage du conteneur apache static"
-docker run -d --name apache_static res/apache_php
+Write-Output "--- Demarrage des conteneurs apache static"
+docker run -d --name apache_static1 res/apache_php
+docker run -d --name apache_static2 res/apache_php
 
 
-Write-Output "--- Demarrage du conteneur expresse dynamic"
-docker run -d --name express_dynamic res/express_names
+Write-Output "--- Demarrage des conteneurs expresse dynamic"
+docker run -d --name express_dynamic1 res/express_names
+docker run -d --name express_dynamic2 res/express_names
 
 
 Write-Output "--- Demarrage du conteneur apache reverse proxy"
-$static_app = docker inspect -f '{{range .NetworkSettings.Networks}}{{.IPAddress}}{{end}}' apache_static 
-$dynamic_app = docker inspect -f '{{range .NetworkSettings.Networks}}{{.IPAddress}}{{end}}' express_dynamic
+$static_app1 = docker inspect -f '{{range .NetworkSettings.Networks}}{{.IPAddress}}{{end}}' apache_static1 
+$static_app2 = docker inspect -f '{{range .NetworkSettings.Networks}}{{.IPAddress}}{{end}}' apache_static2 
+$dynamic_app1 = docker inspect -f '{{range .NetworkSettings.Networks}}{{.IPAddress}}{{end}}' express_dynamic1
+$dynamic_app2 = docker inspect -f '{{range .NetworkSettings.Networks}}{{.IPAddress}}{{end}}' express_dynamic2
  
 
-docker run -d -p 8080:80 -e STATIC_APP=$($static_app + ':80') -e DYNAMIC_APP=$($dynamic_app + ':3000') --name apache_rp res/apache_rp
+docker run -d -p 8080:80 -e STATIC_APP1=$($static_app1 + ':80') -e STATIC_APP2=$($static_app2 + ':80') -e DYNAMIC_APP1=$($dynamic_app1 + ':3000') -e DYNAMIC_APP2=$($dynamic_app2 + ':3000') --name apache_rp res/apache_rp
