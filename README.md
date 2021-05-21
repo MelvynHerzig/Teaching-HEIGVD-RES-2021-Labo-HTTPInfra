@@ -543,7 +543,7 @@ prendre en compte que deux nouveaux serveurs rejoignent l'infrastructure et que 
 ```
 > Nous récupérons deux nouvelles variables d'environnement avec les ip des deux nouveaux serveurs.
 
-> Nous créons deux cluster de serveur <i>dynamic_cluster</i> et <i>static_cluster<i>.
+> Nous créons deux cluster de serveur <i>dynamic_cluster</i> et <i>static_cluster</i>.
   
 > Dans <i>ProxyPass</i> et <i>ProxyPassReverse</i>, nous configurons le proxy pour rediriger les requêtes sur le bon cluster en fonction de la ressource
 
