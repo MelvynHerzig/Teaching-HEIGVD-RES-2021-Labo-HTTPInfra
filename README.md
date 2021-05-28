@@ -650,6 +650,7 @@ prendre en compte la notion de cookies afin d'utiliser les sticky sessions
 ### Tests
 
 À la première connexion <i>demo.res.ch:8080</i>, le serveur envoie les cookies 
+
 ![Initialisation cookie](figures/bonus2_1.png)
 
 À ce moment, pour tester le round robin sur les serveurs dynamiques, nous les éteignons à tour de rôle. La mise à jours des cool names continue de s'effectuer 
@@ -677,7 +678,7 @@ round robin.
 
 ### État de l'infrastructure
 
-![étapeBonusLoadBalancing](figures/infraBonus1.png)
+![étapeBonusLoadBalancing](figures/infraBonus_2.png)
 
 ---
 ## Bonus 4) Interface utilisateur de management
