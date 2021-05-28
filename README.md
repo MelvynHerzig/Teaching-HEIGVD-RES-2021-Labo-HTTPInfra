@@ -560,3 +560,29 @@ Le balancement de charge est fonctionnel.
 ### État de l'infrastructure
 
 ![étapeBonusLoadBalancing](figures/infraBonus1.png)
+
+---
+## Bonus 6) Interface utilisateur de management
+
+	
+Pour réaliser ce bonus, nous avons utilisé Portainer. Portainer est un outil open source pour gérer les applications contenues dans des containers. Évidemment, Portainer fonctionne avec Docker, c'est pourquoi nous l'avons choisi.
+	
+### Mise à jour du script 'startInfra.ps1'
+
+Afin de démarrer l'infrastrucute correctement, nous avons ajouté les commandes suivantes :
+```
+docker volume create portainer_data
+docker run -d -p 8000:8000 -p 9000:9000 --name=portainer --restart=always -v /var/run/docker.sock:/var/run/docker.sock -v portainer_data:/data portainer/portainer-ce
+``` 
+	
+Elles permettent de créer un volume pour Portainer, et de lancer un container avec l'image de Portainer.
+Source : [Utilisation de Portainer avec Docker](https://documentation.portainer.io/v2.0/deploy/ceinstalldocker/)
+	
+### État de l'infrastructure
+![étapeBonusManagementUI](figures/infraBonus4.png)
+	
+### Aperçu du résultat
+![étapeBonusManagementUI](figures/apercuBonus4.png)
+	
+	
+	
