@@ -559,7 +559,7 @@ Le balancement de charge est fonctionnel.
 
 ### État de l'infrastructure
 
-![étapeBonusLoadBalancing](figures/infraBonus1.png)
+![étapeBonusLoadBalancing](figures/infraBonus_1.png)
 
 ---
 ## Bonus 2) round-robin vs sticky sessions
