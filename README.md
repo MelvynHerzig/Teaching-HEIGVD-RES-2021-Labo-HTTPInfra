@@ -415,10 +415,10 @@ docker run -d -p 8080:80 -e STATIC_APP=$($static_app + ':80') -e DYNAMIC_APP=$($
 ![étape5](figures/infra5.png)
 
 ---
-## Bonus 6) Balancement de charge
+## Bonus 1) Balancement de charge
 <b> Branche: </b> fb-load-balancing.
 
-Cette étape à consisté à la mise en place d'un répartisseur de charge au niveau du reverse proxy
+Cette étape consistait à la mise en place d'un répartisseur de charge au niveau du reverse proxy
 
 ### Mise à jour du script de lancement de l'infra structure.
 Pour illustrer le balancement de charge, nous créons, non plus un conteneur apache statique et un conteneur expresse dynamique,
@@ -549,9 +549,9 @@ prendre en compte que deux nouveaux serveurs rejoignent l'infrastructure et que 
 
 ### Tests
 
-Nous commencer par démarrer l'infrastructure avec le script, 5 conteneur tournent. A l'aide du navigateur, nous nous connectons au serveur statique <i> demo.res.ch:8080 </i>.
+Nous commençons par démarrer l'infrastructure avec le script, 5 conteneurs tournent. A l'aide du navigateur, nous nous connectons au serveur statique <i> demo.res.ch:8080 </i>.
 À ce moment nous recevons le site statique avec la mise à jour des cool names.
-Nous faisons tomber deux conteneur, un conteneur apache statique et un conteneur expresse dynamique. Nous rechargeons la page, tout continue de fonctionner.
+Nous faisons tomber deux conteneura, un conteneur apache statique et un conteneur expresse dynamique. Nous rechargeons la page, tout continue de fonctionner.
 Nous remontons les deux conteneurs précédement éteints et nous tuons les deux autres conteneurs staitique et dynamique. Nous rechargeons la page et tout continue de fonctionner.
 
 Le balancement de charge est fonctionnel.
@@ -562,8 +562,126 @@ Le balancement de charge est fonctionnel.
 ![étapeBonusLoadBalancing](figures/infraBonus1.png)
 
 ---
-## Bonus 6) Interface utilisateur de management
+## Bonus 2) round-robin vs sticky sessions
+<b> Branche: </b> fb-sticky-robin.
 
+Cette étape consistait à implémenter la notion de sticky sessions au près des serveurs statiques et un système round robin vers
+les serveurs dynamiques.
+
+Le round robin a déjà été implémenté au cours de l'étape précédente lorsque nous avons créé les clusters de serveur. L'algorithme de
+balancement <i>byrequest</i> effectuait déjà le tri de cette façon.
+
+Il reste donc à implémenter les sticky sessions.
+
+
+### Mise à jour du dockerfile
+
+Le contenu du fichier <i>docker-images/apache-reverse-proxy/Dockerfile</i> a été mis à jour pour
+activer la gestion des entêtes HTTP.
+
+```
+FROM php:7.2-apache 
+
+RUN apt-get update && \
+    apt-get install -y vim
+
+COPY apache2-foreground /usr/local/bin/
+COPY templates/ /var/apache2/templates/
+COPY conf/ /etc/apache2
+
+RUN a2enmod proxy proxy_http proxy_balancer lbmethod_byrequests headers
+
+RUN a2ensite 000-* 001-*
+```
+
+> Désormais, nous activons le module headers
+
+### Mise à jour template de 001-reverse-proxy.conf
+
+Le contenu du fichier <i>docker-images/apache-reverse-proxy/templates,config-template.php</i> a été mis à jour pour 
+prendre en compte la notion de cookies afin d'utiliser les sticky sessions
+
+```
+<?php
+  # Récupération des adresses des serveurs apache dynamiques
+  $DYNAMIC_APP1 = getenv('DYNAMIC_APP1');
+  $DYNAMIC_APP2 = getenv('DYNAMIC_APP2');
+
+  # Récupération des adresses des serveurs apache "statiques"
+  $STATIC_APP1 = getenv('STATIC_APP1');
+  $STATIC_APP2 = getenv('STATIC_APP2');
+?>
+
+<VirtualHost *:80>
+
+    ServerName demo.res.ch
+
+    # Configuration du load balancing
+
+    <Proxy "balancer://dynamic_cluster">
+	    BalancerMember "http://<?php print "$DYNAMIC_APP1"?>"
+	    BalancerMember "http://<?php print "$DYNAMIC_APP2"?>"
+    </Proxy>
+
+    Header add Set-Cookie "ROUTEID=.%{BALANCER_WORKER_ROUTE}e; path=/" env=BALANCER_ROUTE_CHANGED
+    <Proxy "balancer://static_cluster">
+	    BalancerMember "http://<?php print "$STATIC_APP1"?>" route=1
+	    BalancerMember "http://<?php print "$STATIC_APP2"?>" route=2
+	    ProxySet stickysession=ROUTEID
+    </Proxy>
+
+    ProxyPass "/api/names/" "balancer://dynamic_cluster/"
+    ProxyPassReverse "/api/names/" 'balancer://dynamic_cluster/"
+      
+    ProxyPass "/" "balancer://static_cluster/"
+    ProxyPassReverse "/" "balancer://static_cluster/"
+
+</VirtualHost>
+```
+> Nous définissons la création d'un cookie avec Header ass Set-Cookie.
+> Le client reçoit l'id de la route à utiliser dans ROUTID, et la ressource applicable à cette route dans path.
+
+> Dans le cluster concerné, nous définissons les sticky sessions avec la directive ProxySet. Nous annoncons de rediriger
+> la requête vers le serveur dont la route correspond à la valeur dans ROUTEID. Si le serveur n'est pas accessible, la ROUTEID
+> du cookie sera mise à jour.
+  
+> Ainsi nous sommes garanti de toujours communiquer avec le même serveur statique tant que ce dernier est joignable.
+
+### Tests
+
+À la première connexion <i>demo.res.ch:8080</i>, le serveur envoie les cookies 
+![Initialisation cookie](figures/bonus2_1.png)
+
+À ce moment, pour tester le round robin sur les serveurs dynamiques, nous les éteignons à tour de rôle. La mise à jours des cool names continue de s'effectuer 
+tant qu'un serveur dynamique est accessible. Le round robin fonctionne.
+
+Désormais lorsque nous redémarrons/rechargeons la page statique, nous transmettons le cookie ROUTEID.
+
+![Transfert cookie](figures/bonus2_2.png)
+
+Tant que le serveur correspondant à ROUTEID est accessible, nous commiquons avec lui et ne reçevons pas à nouveau l'entête Set-Cookie.
+Ainsi nous pouvons recharger la page autant de fois que nous le souhaitons, tant que le cookie ROOTEID est présent, nous communiquons à un seul serveur.
+
+Si nous éteignons le serveur correspondant à notre ROUTEID, nous recevons un nouveau ROUTEID.
+
+![Réception nouvelle route](figures/bonus2_3.png)
+
+Désormais, même si nous rallumons notre serveur initial, nous communiquons avec la nouvelle route que nous avons reçue.
+
+![Utilisation nouvelle route](figures/bonus2_4.png)
+
+Comme le montre la dernière figures, le cookie ROOTEID n'est pas set tant que le serveur correspondant est atteignable.
+
+Au terme de cette démarche, nous avons montré que les serveurs statiques fonctionne avec des sticky sessions et que les serveurs dynamiques sont en mode
+round robin.
+
+### État de l'infrastructure
+
+![étapeBonusLoadBalancing](figures/infraBonus1.png)
+
+---
+## Bonus 4) Interface utilisateur de management
+<b> Branche: </b> fb-load-balancing.
 	
 Pour réaliser ce bonus, nous avons utilisé Portainer. Portainer est un outil open source pour gérer les applications contenues dans des containers. Évidemment, Portainer fonctionne avec Docker, c'est pourquoi nous l'avons choisi.
 	
