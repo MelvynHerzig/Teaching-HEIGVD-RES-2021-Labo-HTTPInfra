@@ -677,7 +677,7 @@ round robin.
 
 ### État de l'infrastructure
 
-![étapeBonusLoadBalancing](figures/infraBonus1.png)
+![étapeBonusLoadBalancing](figures/infraBonus_2.png)
 
 ---
 ## Bonus 4) Interface utilisateur de management
