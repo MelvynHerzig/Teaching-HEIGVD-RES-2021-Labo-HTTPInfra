@@ -579,10 +579,10 @@ Elles permettent de créer un volume pour Portainer, et de lancer un container a
 Source : [Utilisation de Portainer avec Docker](https://documentation.portainer.io/v2.0/deploy/ceinstalldocker/)
 	
 ### État de l'infrastructure
-![étapeBonusManagementUI](figures/infraBonus4.png)
+![infraÉtapeBonusManagementUI](figures/infraBonus4.png)
 	
 ### Aperçu du résultat
-![étapeBonusManagementUI](figures/apercuBonus4.png)
+![aperçuÉtapeBonusManagementUI](figures/apercuBonus4.png)
 	
 	
 	
