@@ -682,7 +682,7 @@ round robin.
 
 ---
 ## Bonus 4) Interface utilisateur de management
-<b> Branche: </b> fb-load-balancing.
+<b> Branche: </b> fb-management-ui.
 	
 Pour réaliser ce bonus, nous avons utilisé Portainer. Portainer est un outil open source pour gérer les applications contenues dans des containers. Évidemment, Portainer fonctionne avec Docker, c'est pourquoi nous l'avons choisi.
 	
